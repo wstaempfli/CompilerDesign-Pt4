@@ -303,7 +303,7 @@ and __ocaml_lex_token_rec lexbuf __ocaml_lex_state =
 
   | 3 ->
 # 119 "lexer.mll"
-        ( let p = lexeme_start_p lexbuf in
+        ( let p = lexeme_start_p lexbuf in (*jump into directive state*)
           if p.pos_cnum - p.pos_bol = 0 then directive 0 lexbuf 
           else raise (Lexer_error (lex_long_range lexbuf,
             Printf.sprintf "# can only be the 1st char in a line.")) )

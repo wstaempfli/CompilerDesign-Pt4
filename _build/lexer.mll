@@ -110,19 +110,19 @@ let character = uppercase | lowercase
 let whitespace = ['\t' ' ']
 let digit = ['0'-'9']
 let hexdigit = ['0'-'9'] | ['a'-'f'] | ['A'-'F']
-
+(*Define different Lexer states*)
 rule token = parse
   | eof { EOF }
 
-  | "/*" { start_lex := start_pos_of_lexbuf lexbuf; comments 0 lexbuf }
-  | '"' { reset_str(); start_lex := start_pos_of_lexbuf lexbuf; string false lexbuf }
-  | '#' { let p = lexeme_start_p lexbuf in
+  | "/*" { start_lex := start_pos_of_lexbuf lexbuf; comments 0 lexbuf } (*jump into comment state*)
+  | '"' { reset_str(); start_lex := start_pos_of_lexbuf lexbuf; string false lexbuf } (*jump into string state*)
+  | '#' { let p = lexeme_start_p lexbuf in (*jump into directive state*)
           if p.pos_cnum - p.pos_bol = 0 then directive 0 lexbuf 
           else raise (Lexer_error (lex_long_range lexbuf,
             Printf.sprintf "# can only be the 1st char in a line.")) }
-
-  | lowercase (digit | character | '_')* { create_token lexbuf }
-  | digit+ | "0x" hexdigit+ { INT (Int64.of_string (lexeme lexbuf)) }
+  (*potential identifier: starts with lowercase char followed by a finite num of chars or digits*)
+  | lowercase (digit | character | '_')* { create_token lexbuf } (*decide whether keyword or IDENT*)
+  | digit+ | "0x" hexdigit+ { INT (Int64.of_string (lexeme lexbuf)) } (*plus meaning at least one whereas the kleene star means at least 0*)
   | whitespace+ { token lexbuf }
   | newline { newline lexbuf; token lexbuf }
 

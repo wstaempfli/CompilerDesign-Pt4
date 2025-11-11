@@ -1,3 +1,4 @@
+open Range
 
 type 'a node = { elt : 'a; loc : Range.t }
 
@@ -11,7 +12,7 @@ type id = string
 type ty =
 | TBool
 | TInt
-| TRef of rty
+| TRef of rty (*Reference Type ?*)
 and rty =
 | RString
 | RArray of ty
