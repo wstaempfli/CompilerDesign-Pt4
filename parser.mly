@@ -18,7 +18,7 @@ let loc (startpos:Lexing.position) (endpos:Lexing.position) (elt:'a) : 'a node =
 %token TSTRING  /* string */
 %token IF       /* if */
 %token ELSE     /* else */
-%token WHILE    /* while */
+%token WHILE    /* while */ 
 %token RETURN   /* return */
 %token VAR      /* var */
 %token SEMI     /* ; */
@@ -38,6 +38,31 @@ let loc (startpos:Lexing.position) (endpos:Lexing.position) (elt:'a) : 'a node =
 %token BANG     /* ! */
 %token GLOBAL   /* global */
 
+%token SHL      /* << */
+%token SLR      /* >> */
+%token SAR      /* >>> */
+%token LT       /* < */
+%token GT       /* > */
+%token LTEQ     /* <= */
+%token GTEQ     /* >= */
+%token NEQ   /* != */
+%token LAND     /* & */
+%token LOR      /* | */
+%token BAND     /* [&] */
+%token BOR      /* [|] */
+
+
+/* ---------------------------------------------------------------------- */
+
+(*Associativity*)
+%left BOR
+%left BAND
+%left LOR
+%left LAND
+%left NEQ
+%left EQEQ
+%left GTEQ GT LTEQ LT
+%left SAR SLR SHL
 %left PLUS DASH
 %left STAR
 %nonassoc BANG
