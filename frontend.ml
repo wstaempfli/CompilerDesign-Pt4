@@ -359,6 +359,34 @@ let cmp_function_ctxt (c:Ctxt.t) (p:Ast.prog) : Ctxt.t =
       | _ -> c
     ) c p 
 
+(* Compile a global initializer, returning the resulting LLVMlite global
+   declaration, and a list of additional global declarations.
+
+   Tips:
+   - Only CNull, CBool, CInt, CStr, and CArr can appear as global initializers
+     in well-formed OAT programs. Your compiler may throw an error for the other
+     cases
+
+   - OAT arrays are always handled via pointers. A global array of arrays will
+     be an array of pointers to arrays emitted as additional global declarations.
+*)
+
+let rec cmp_gexp (c : Ctxt.t) (e:Ast.exp node) : Ll.gdecl * (Ll.gid * Ll.gdecl) list = match e.elt with
+  |CInt i -> ((I64, GInt i)),[]
+  |CBool b -> ((I1, GInt (if b then 1L else 0L))),[]
+  |CNull t -> ((cmp_ty (TRef t)), GNull),[]
+  |CStr s-> 
+    let hoist_ty = Ll.Array (String.length s + 1, I8) in
+    let gid = gensym "str" in
+    let original_ty = Ptr hoist_ty in
+    let wanted_ty = Ptr I8 in
+    let cast = GBitcast(original_ty, GGid gid, wanted_ty) in
+    (wanted_ty, cast), [(gid, (original_ty, GString s))]
+    | CArr (arr_ty, arr_nodes) -> failwith "CArr case not implemented! [cmp_gexp]"
+    | _ -> failwith "invalid expression! [cmp_gexp]"
+
+
+
 (* Populate a context with bindings for global variables 
    mapping OAT identifiers to LLVMlite gids and their types.
 
@@ -366,8 +394,16 @@ let cmp_function_ctxt (c:Ctxt.t) (p:Ast.prog) : Ctxt.t =
    in well-formed programs. (The constructors starting with C). 
 *)
 let cmp_global_ctxt (c:Ctxt.t) (p:Ast.prog) : Ctxt.t =
-  failwith "cmp_global_ctxt not implemented"
-
+  List.fold_right (fun a b -> begin 
+                                match a with
+                                  | (Gvdecl {elt=gd;loc=_}) -> 
+                                      let (ll_ty, _), _ = (cmp_gexp c gd.init) in       
+                                      let store_ty = Ptr ll_ty in 
+                                      let ll_op = Gid gd.name in 
+                                      Ctxt.add b gd.name (store_ty, ll_op)
+                                  | _ -> b
+                              end
+                  ) p c
 (* Compile a function declaration in global context c. Return the LLVMlite cfg
    and a list of global declarations containing the string literals appearing
    in the function.
@@ -382,21 +418,6 @@ let cmp_global_ctxt (c:Ctxt.t) (p:Ast.prog) : Ctxt.t =
 
 let cmp_fdecl (c:Ctxt.t) (f:Ast.fdecl node) : Ll.fdecl * (Ll.gid * Ll.gdecl) list =
   failwith "cmp_fdecl not implemented"
-
-(* Compile a global initializer, returning the resulting LLVMlite global
-   declaration, and a list of additional global declarations.
-
-   Tips:
-   - Only CNull, CBool, CInt, CStr, and CArr can appear as global initializers
-     in well-formed OAT programs. Your compiler may throw an error for the other
-     cases
-
-   - OAT arrays are always handled via pointers. A global array of arrays will
-     be an array of pointers to arrays emitted as additional global declarations.
-*)
-
-let rec cmp_gexp c (e:Ast.exp node) : Ll.gdecl * (Ll.gid * Ll.gdecl) list =
-  failwith "cmp_gexp not implemented"
 
 (* Oat internals function context ------------------------------------------- *)
 let internals = [
