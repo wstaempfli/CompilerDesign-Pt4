@@ -92,9 +92,9 @@ let loc (startpos:Lexing.position) (endpos:Lexing.position) (elt:'a) : 'a node =
 %%
 
 stmt_exp:
-  | p=lhs EQ e=exp
+  | p=lhs EQ e=exp SEMI
     { loc $startpos $endpos @@ Assn(p,e) }
-  | e=exp LPAREN es=separated_list(COMMA, exp) RPAREN
+  | e=exp LPAREN es=separated_list(COMMA, exp) RPAREN SEMI
     { loc $startpos $endpos @@ SCall(e, es) }
 
 exp_top:
