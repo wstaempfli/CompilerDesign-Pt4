@@ -305,7 +305,112 @@ let oat_alloc_array (t:Ast.ty) (size:Ll.operand) : Ll.ty * operand * stream =
 *)
 
 let rec cmp_exp (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.operand * stream =
-  failwith "cmp_exp not implemented"
+  match exp.elt with
+  (* Integer Constant: 15 *)
+  | CInt i ->
+    (I64, Const i, [])
+
+  (* Boolean Constant: true *)
+  | CBool b ->
+    let ll_val = if b then 1L else 0L in
+    (I1, Const ll_val, [])
+
+  (* Identifier: x *)
+  (* This compiles an expression, so we LOAD the value from its slot. *)
+  | Id id ->
+    let (ll_ptr_ty, ll_ptr_op) = Ctxt.lookup id c in
+    (* Get the type of the value (e.g., I64) from the pointer type (e.g., Ptr I64) *)
+    let ll_val_ty = match ll_ptr_ty with
+      | Ptr t -> t
+      | _ -> failwith ("Identifier " ^ id ^ " is not a pointer type in context")
+    in
+    let res_uid = gensym id in
+    let stream = [I (res_uid, Load (ll_ptr_ty, ll_ptr_op))] in
+    (ll_val_ty, Id res_uid, stream)
+
+  (* Unary Operation: -x, !b, ~y *)
+  | Uop (uop, e_node) ->
+    let (e_ty, e_op, e_stream) = cmp_exp c e_node in
+    let res_uid = gensym "uop" in
+    (match uop with
+      | Neg ->
+        (* Implements -x as 0 - x *)
+        let insn = I (res_uid, Binop (Sub, I64, Const 0L, e_op)) in
+        (I64, Id res_uid, e_stream >@ [insn])
+      | Bitnot ->
+        (* Implements ~x as x XOR -1 *)
+        let insn = I (res_uid, Binop (Xor, I64, e_op, Const (-1L))) in
+        (I64, Id res_uid, e_stream >@ [insn])
+      | Lognot ->
+        (* Implements !b as b XOR 1 *)
+        let insn = I (res_uid, Binop (Xor, I1, e_op, Const 1L)) in
+        (I1, Id res_uid, e_stream >@ [insn])
+    )
+
+  (* Binary Operation: x + y, a > b, c & d *)
+  | Bop (bop, e1_node, e2_node) ->
+    let (e1_ty, e1_op, e1_stream) = cmp_exp c e1_node in
+    let (e2_ty, e2_op, e2_stream) = cmp_exp c e2_node in
+    let arg_stream = e1_stream >@ e2_stream in
+    let res_uid = gensym "bop" in
+    (match bop with
+      (* Arithmetic: +, -, *, &, | (for I64) *)
+      | Add | Sub | Mul | IAnd | IOr ->
+        let ll_bop = match bop with
+          | Add  -> Ll.Add
+          | Sub  -> Ll.Sub
+          | Mul  -> Ll.Mul
+          | IAnd -> Ll.And
+          | IOr  -> Ll.Or
+          | _ -> failwith "Impossible case"
+        in
+        let insn = I (res_uid, Binop (ll_bop, I64, e1_op, e2_op)) in
+        (I64, Id res_uid, arg_stream >@ [insn])
+      
+      (* Bit Shifts: <<, >>, >>> (for I64) *)
+      | Shl | Shr | Sar ->
+        let ll_bop = match bop with
+          | Shl -> Ll.Shl
+          | Shr -> Ll.Lshr  (* Logical Shift Right *)
+          | Sar -> Ll.Ashr  (* Arithmetic Shift Right *)
+          | _ -> failwith "Impossible case"
+        in
+        let insn = I (res_uid, Binop (ll_bop, I64, e1_op, e2_op)) in
+        (I64, Id res_uid, arg_stream >@ [insn])
+
+      (* Comparisons: ==, !=, <, <=, >, >= (for I64, returns I1) *)
+      | Eq | Neq | Lt | Lte | Gt | Gte ->
+        let ll_cnd = match bop with
+          | Eq  -> Ll.Eq
+          | Neq -> Ll.Ne
+          | Lt  -> Ll.Slt (* Signed Less Than *)
+          | Lte -> Ll.Sle
+          | Gt  -> Ll.Sgt
+          | Gte -> Ll.Sge
+          | _ -> failwith "Impossible case"
+        in
+        (* Note: We use e1_ty, which should be I64 *)
+        let insn = I (res_uid, Icmp (ll_cnd, e1_ty, e1_op, e2_op)) in
+        (I1, Id res_uid, arg_stream >@ [insn])
+
+      (* Logical: &, | (for I1) *)
+      | And | Or ->
+        let ll_bop = match bop with
+          | And -> Ll.And
+          | Or  -> Ll.Or
+          | _ -> failwith "Impossible case"
+        in
+        let insn = I (res_uid, Binop (ll_bop, I1, e1_op, e2_op)) in
+        (I1, Id res_uid, arg_stream >@ [insn])
+    )
+
+  (* --- Cases below are not yet implemented --- *)
+  | CNull rty -> failwith "cmp_exp: CNull not implemented"
+  | CStr s -> failwith "cmp_exp: CStr not implemented"
+  | CArr (ty, exps) -> failwith "cmp_exp: CArr not implemented"
+  | NewArr (ty, exp) -> failwith "cmp_exp: NewArr not implemented"
+  | Index (e1, e2) -> failwith "cmp_exp: Index not implemented"
+  | Call (e, exps) -> failwith "cmp_exp: Call not implemented"
 
 (* Compile a statement in context c with return typ rt. Return a new context, 
    possibly extended with new local bindings, and the instruction stream
@@ -331,11 +436,16 @@ let rec cmp_exp (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.operand * stream =
    - compiling the left-hand-side of an assignment is almost exactly like
      compiling the Id or Index expression. Instead of loading the resulting
      pointer, you just need to store to it!
-
  *)
 
-let rec cmp_stmt (c:Ctxt.t) (rt:Ll.ty) (stmt:Ast.stmt node) : Ctxt.t * stream =
-  failwith "cmp_stmt not implemented"
+let rec cmp_stmt (c:Ctxt.t) (rt:Ll.ty) (stmt:Ast.stmt node) : Ctxt.t * stream = match stmt.elt with
+  | Ret None -> (c, [T (Ret (Void, None))])
+  | Ret (Some e_node) -> 
+      let (e_ty, e, e_stream) = cmp_exp c e_node in
+      (c, e_stream >:: (T (Ret (e_ty, Some e)))) 
+  | Assn (e1_node, e2_node) -> failwith "unimplemented1"
+  | Decl (id, e_node) -> failwith "unimplemented2"
+  | _ -> failwith "unimplemented3"
 
 (* Compile a series of statements *)
 and cmp_block (c:Ctxt.t) (rt:Ll.ty) (stmts:Ast.block) : Ctxt.t * stream =
@@ -381,7 +491,7 @@ let rec cmp_gexp (c : Ctxt.t) (e:Ast.exp node) : Ll.gdecl * (Ll.gid * Ll.gdecl) 
     let original_ty = Ptr hoist_ty in
     let wanted_ty = Ptr I8 in
     let cast = GBitcast(original_ty, GGid gid, wanted_ty) in
-    (wanted_ty, cast), [(gid, (original_ty, GString s))]
+    (wanted_ty, cast), [(gid, (hoist_ty, GString s))]
     | CArr (arr_ty, arr_nodes) -> failwith "CArr case not implemented! [cmp_gexp]"
     | _ -> failwith "invalid expression! [cmp_gexp]"
 
@@ -415,9 +525,75 @@ let cmp_global_ctxt (c:Ctxt.t) (p:Ast.prog) : Ctxt.t =
    4. Compile the body of the function using cmp_block
    5. Use cfg_of_stream to produce a LLVMlite cfg from 
  *)
+(*
+{
+  frtyp : ret_ty;
+  fname : id;
+  args : (Ast.ty * id) list;
+  body : Ast.block;
+}
+  ->
 
+{ 
+  f_ty : fty;
+  f_param : id list;
+  f_cfg : cfg; 
+}
+*)
 let cmp_fdecl (c:Ctxt.t) (f:Ast.fdecl node) : Ll.fdecl * (Ll.gid * Ll.gdecl) list =
-  failwith "cmp_fdecl not implemented"
+
+  let fdecl_node = f.elt in
+  let llvm_ret_ty = cmp_ret_ty fdecl_node.frtyp in
+  let llvm_param_tys = List.map (fun (ty, _) -> cmp_ty ty) fdecl_node.args in
+  let param_ids = List.map (fun (_, id) -> id) fdecl_node.args in
+
+  (* 1. Map over arguments to process them and create stack slots *)
+  (* This list now holds all the info needed for each parameter *)
+  let processed_params =
+    List.map (fun (oat_ty, param_id) ->
+      let llvm_ty = cmp_ty oat_ty in
+      (* The uid for the stack slot (alloca) *)
+      let slot_uid = gensym param_id in
+      (param_id, llvm_ty, slot_uid)
+    ) fdecl_node.args
+  in
+
+  (* 2. Build the new context from the processed parameter info *)
+  let c_with_params =
+    List.fold_left (fun acc_c (param_id, llvm_ty, slot_uid) ->
+      (* The context maps the OAT id to the *address* of its stack slot *)
+      Ctxt.add acc_c param_id (Ptr llvm_ty, Id slot_uid)
+    ) c processed_params
+  in
+
+  (* 3. Build the instruction stream for allocating and storing parameters *)
+  let param_setup_stream =
+    List.fold_left (fun acc_stream (param_id, llvm_ty, slot_uid) ->
+      (* E: Hoist alloca to the function's entry block *)
+      let alloca_insn = E (slot_uid, Alloca llvm_ty) in
+      (* I: Store the incoming parameter (Id param_id) into its stack slot (Id slot_uid) *)
+      let store_insn = I (gensym "store", Store (llvm_ty, Id param_id, Id slot_uid)) in
+      (* Build the stream in order *)
+      acc_stream >@ [alloca_insn; store_insn]
+    ) [] processed_params
+  in
+
+  (* 4. Compile the function body with the new context *)
+  let _, body_stream = cmp_block c_with_params llvm_ret_ty fdecl_node.body in
+
+  (* 5. Combine streams and build the CFG *)
+  let full_stream = param_setup_stream @ body_stream in
+  let cfg, hoisted_globals = cfg_of_stream full_stream in
+
+  (* 6. Assemble the final LLVM function declaration *)
+  let llvm_fdecl = {
+    f_ty = (llvm_param_tys, llvm_ret_ty);
+    f_param = param_ids;
+    f_cfg = cfg
+  } in
+
+  (llvm_fdecl, hoisted_globals)
+
 
 (* Oat internals function context ------------------------------------------- *)
 let internals = [
