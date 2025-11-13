@@ -9,7 +9,6 @@ let loc (startpos:Lexing.position) (endpos:Lexing.position) (elt:'a) : 'a node =
 /* Declare your tokens here. */
 %token EOF
 %token <int64>  INT
-%token <bool>  BOOL
 %token NULL
 %token <string> STRING
 %token <string> IDENT
@@ -53,16 +52,19 @@ let loc (startpos:Lexing.position) (endpos:Lexing.position) (elt:'a) : 'a node =
 %token BAND     /* [&] */
 %token BOR      /* [|] */
 %token NEW     /* new */
+%token FOR     /* for */
+%token TRUE
+%token FALSE
 
 
 /* ---------------------------------------------------------------------- */
-
+ 
 (*Associativity*)
 %left BOR
 %left BAND
 %left LOR
 %left LAND
-%left NEQ
+%left BANGEQ
 %left EQEQ
 %left GTEQ GT LTEQ LT
 %left SAR SLR SHL
@@ -84,9 +86,16 @@ let loc (startpos:Lexing.position) (endpos:Lexing.position) (elt:'a) : 'a node =
 %type <Ast.prog> prog
 %type <Ast.exp Ast.node> exp
 %type <Ast.stmt Ast.node> stmt
+%type <Ast.stmt Ast.node> stmt_exp
 %type <Ast.block> block
 %type <Ast.ty> ty
 %%
+
+stmt_exp:
+  | p=lhs EQ e=exp
+    { loc $startpos $endpos @@ Assn(p,e) }
+  | e=exp LPAREN es=separated_list(COMMA, exp) RPAREN
+    { loc $startpos $endpos @@ SCall(e, es) }
 
 exp_top:
   | e=exp EOF { e }
@@ -105,18 +114,19 @@ decl:
 
 arglist:
   | l=separated_list(COMMA, pair(ty,IDENT)) { l }
-    
+
+rtyp:
+  | TSTRING                 { RString }
+  | t=ty LBRACKET RBRACKET  { RArray t }
+
 ty:
-  | TINT   { TInt }
-  | r=rtyp { TRef r } 
+  | TINT    { TInt }
+  | TBOOL   { TBool }
+  | r=rtyp  { TRef r }
 
 %inline ret_ty:
   | TVOID  { RetVoid }
   | t=ty   { RetVal t }
-
-%inline rtyp:
-  | TSTRING { RString }
-  | t=ty LBRACKET RBRACKET { RArray t }
 
 %inline bop:
   | PLUS   { Add }
@@ -145,6 +155,8 @@ gexp:
   | t=rtyp NULL  { loc $startpos $endpos @@ CNull t }
   | s=STRING   { loc $startpos $endpos @@ CStr s }
   | i=INT      { loc $startpos $endpos @@ CInt i }
+  | b=TRUE       { loc $startpos $endpos @@ CBool true }
+  | b=FALSE      { loc $startpos $endpos @@ CBool false }
   | NEW t=ty LBRACKET RBRACKET LBRACE es=separated_list(COMMA, gexp) RBRACE
                       { loc $startpos $endpos @@ CArr (t, es) }
 
@@ -155,7 +167,8 @@ lhs:
 
 exp:
   | i=INT               { loc $startpos $endpos @@ CInt i }
-  | b=BOOL              { loc $startpos $endpos @@ CBool b }
+  | b=TRUE              { loc $startpos $endpos @@ CBool true }
+  | b=FALSE             { loc $startpos $endpos @@ CBool false }
   | s=STRING            { loc $startpos $endpos @@ CStr s }
   | t=rtyp NULL         { loc $startpos $endpos @@ CNull t }
   | e1=exp b=bop e2=exp { loc $startpos $endpos @@ Bop (b, e1, e2) }
@@ -184,6 +197,8 @@ stmt:
   | RETURN e=exp SEMI   { loc $startpos $endpos @@ Ret(Some e) }
   | WHILE LPAREN e=exp RPAREN b=block  
                         { loc $startpos $endpos @@ While(e, b) } 
+  | FOR LPAREN init=separated_list(COMMA, vdecl) SEMI cond=option(exp) SEMI update=option(stmt_exp) RPAREN b=block
+    { loc $startpos $endpos @@ For(init, cond, update, b) }
 
 block:
   | LBRACE stmts=list(stmt) RBRACE { stmts }

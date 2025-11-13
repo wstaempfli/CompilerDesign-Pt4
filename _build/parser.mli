@@ -6,6 +6,7 @@ type token =
   | VAR
   | TVOID
   | TSTRING
+  | TRUE
   | TINT
   | TILDE
   | TBOOL
@@ -35,6 +36,8 @@ type token =
   | GTEQ
   | GT
   | GLOBAL
+  | FOR
+  | FALSE
   | EQEQ
   | EQ
   | EOF
@@ -42,7 +45,6 @@ type token =
   | DASH
   | COMMA
   | BOR
-  | BOOL of (bool)
   | BANGEQ
   | BANG
   | BAND
