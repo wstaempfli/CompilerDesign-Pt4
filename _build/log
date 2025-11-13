@@ -3,7 +3,7 @@
 # Shared cache: disabled
 # Workspace root: /home/student/hw
 # Auto-detected concurrency: 12
-$ /home/student/.opam/4.13.1/bin/ocamlc.opt -config > /tmp/dune_73a0b3_output
+$ /home/student/.opam/4.13.1/bin/ocamlc.opt -config > /tmp/dune_2ba98d_output
 # Dune context:
 #  { name = "default"
 #  ; kind = "default"
@@ -113,196 +113,14 @@ $ (cd _build/default && /home/student/.opam/4.13.1/bin/ocamlc.opt -w @1..3@5..28
 > 1 | open Range
 >     ^^^^^^^^^^
 > Warning 33 [unused-open]: unused open Dune__exe.Range.
-$ (cd _build/default && /home/student/.opam/4.13.1/bin/ocamlc.opt -w @1..3@5..28@30..39@43@46..47@49..57@61..62-40 -strict-sequence -strict-formats -short-paths -keep-locs -warn-error -A -no-strict-formats -g -bin-annot -I .main.eobjs/byte -no-alias-deps -opaque -open Dune__exe -o .main.eobjs/byte/dune__exe__Progasts.cmo -c -impl progasts.ml)
-$ (cd _build/default && /home/student/.opam/4.13.1/bin/ocamlc.opt -w @1..3@5..28@30..39@43@46..47@49..57@61..62-40 -strict-sequence -strict-formats -short-paths -keep-locs -warn-error -A -no-strict-formats -g -bin-annot -I .main.eobjs/byte -no-alias-deps -opaque -open Dune__exe -o .main.eobjs/byte/dune__exe__Frontend.cmo -c -impl frontend.ml)
-> File "frontend.ml", line 307, characters 8-15:
-> 307 | let rec cmp_exp (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.operand * stream =
->               ^^^^^^^
-> Warning 39 [unused-rec-flag]: unused rec flag.
-> File "frontend.ml", line 356, characters 25-47:
-> 356 |       | Ast.Gfdecl { elt={ frtyp; fname; args } } ->
->                                ^^^^^^^^^^^^^^^^^^^^^^
-> Warning 9 [missing-record-field-pattern]: the following labels are not bound in this record pattern:
-> body
-> Either bind these labels explicitly or add '; _' to the pattern.
-> File "frontend.ml", line 356, characters 19-49:
-> 356 |       | Ast.Gfdecl { elt={ frtyp; fname; args } } ->
->                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-> Warning 9 [missing-record-field-pattern]: the following labels are not bound in this record pattern:
-> loc
-> Either bind these labels explicitly or add '; _' to the pattern.
-> File "frontend.ml", line 398, characters 8-16:
-> 398 | let rec cmp_gexp c (e:Ast.exp node) : Ll.gdecl * (Ll.gid * Ll.gdecl) list =
->               ^^^^^^^^
-> Warning 39 [unused-rec-flag]: unused rec flag.
-> File "frontend.ml", line 434, characters 21-31:
-> 434 |         | Ast.Gvdecl { elt=gd } -> 
->                            ^^^^^^^^^^
-> Warning 9 [missing-record-field-pattern]: the following labels are not bound in this record pattern:
-> loc
-> Either bind these labels explicitly or add '; _' to the pattern.
-> File "frontend.ml", line 2, characters 0-11:
-> 2 | open Llutil
->     ^^^^^^^^^^^
-> Warning 33 [unused-open]: unused open Dune__exe.Llutil.
-> File "frontend.ml", line 277, characters 17-18:
-> 277 | let size_oat_ty (t : Ast.ty) = 8L
->                        ^
-> Warning 27 [unused-var-strict]: unused variable t.
-> File "frontend.ml", line 307, characters 17-18:
-> 307 | let rec cmp_exp (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.operand * stream =
->                        ^
-> Warning 27 [unused-var-strict]: unused variable c.
-> File "frontend.ml", line 307, characters 28-31:
-> 307 | let rec cmp_exp (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.operand * stream =
->                                   ^^^
-> Warning 27 [unused-var-strict]: unused variable exp.
-> File "frontend.ml", line 337, characters 18-19:
-> 337 | let rec cmp_stmt (c:Ctxt.t) (rt:Ll.ty) (stmt:Ast.stmt node) : Ctxt.t * stream =
->                         ^
-> Warning 27 [unused-var-strict]: unused variable c.
-> File "frontend.ml", line 337, characters 29-31:
-> 337 | let rec cmp_stmt (c:Ctxt.t) (rt:Ll.ty) (stmt:Ast.stmt node) : Ctxt.t * stream =
->                                    ^^
-> Warning 27 [unused-var-strict]: unused variable rt.
-> File "frontend.ml", line 337, characters 40-44:
-> 337 | let rec cmp_stmt (c:Ctxt.t) (rt:Ll.ty) (stmt:Ast.stmt node) : Ctxt.t * stream =
->                                               ^^^^
-> Warning 27 [unused-var-strict]: unused variable stmt.
-> File "frontend.ml", line 368, characters 21-22:
-> 368 | let cmp_global_ctxt (c:Ctxt.t) (p:Ast.prog) : Ctxt.t =
->                            ^
-> Warning 27 [unused-var-strict]: unused variable c.
-> File "frontend.ml", line 368, characters 32-33:
-> 368 | let cmp_global_ctxt (c:Ctxt.t) (p:Ast.prog) : Ctxt.t =
->                                       ^
-> Warning 27 [unused-var-strict]: unused variable p.
-> File "frontend.ml", line 383, characters 15-16:
-> 383 | let cmp_fdecl (c:Ctxt.t) (f:Ast.fdecl node) : Ll.fdecl * (Ll.gid * Ll.gdecl) list =
->                      ^
-> Warning 27 [unused-var-strict]: unused variable c.
-> File "frontend.ml", line 383, characters 26-27:
-> 383 | let cmp_fdecl (c:Ctxt.t) (f:Ast.fdecl node) : Ll.fdecl * (Ll.gid * Ll.gdecl) list =
->                                 ^
-> Warning 27 [unused-var-strict]: unused variable f.
-> File "frontend.ml", line 398, characters 17-18:
-> 398 | let rec cmp_gexp c (e:Ast.exp node) : Ll.gdecl * (Ll.gid * Ll.gdecl) list =
->                        ^
-> Warning 27 [unused-var-strict]: unused variable c.
-> File "frontend.ml", line 398, characters 20-21:
-> 398 | let rec cmp_gexp c (e:Ast.exp node) : Ll.gdecl * (Ll.gid * Ll.gdecl) list =
->                           ^
-> Warning 27 [unused-var-strict]: unused variable e.
-$ (cd _build/default && /home/student/.opam/4.13.1/bin/ocamlc.opt -w @1..3@5..28@30..39@43@46..47@49..57@61..62-40 -strict-sequence -strict-formats -short-paths -keep-locs -warn-error -A -no-strict-formats -g -bin-annot -I .main.eobjs/byte -no-alias-deps -opaque -open Dune__exe -o .main.eobjs/byte/dune__exe__Astlib.cmo -c -impl astlib.ml)
-> File "astlib.ml", line 223, characters 24-56:
-> 223 | let print_fdecl_aux fmt {elt={frtyp; fname; args; body}} =
->                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-> Warning 9 [missing-record-field-pattern]: the following labels are not bound in this record pattern:
-> loc
-> Either bind these labels explicitly or add '; _' to the pattern.
-> File "astlib.ml", line 8, characters 0-10:
-> 8 | open Range
->     ^^^^^^^^^^
-> Warning 33 [unused-open]: unused open Dune__exe.Range.
-$ (cd _build/default && /home/student/.opam/4.13.1/bin/ocamlopt.opt -w @1..3@5..28@30..39@43@46..47@49..57@61..62-40 -strict-sequence -strict-formats -short-paths -keep-locs -warn-error -A -no-strict-formats -g -I .main.eobjs/byte -I .main.eobjs/native -intf-suffix .ml -no-alias-deps -opaque -open Dune__exe -o .main.eobjs/native/dune__exe__Ast.cmx -c -impl ast.ml)
-> File "ast.ml", line 1, characters 0-10:
-> 1 | open Range
->     ^^^^^^^^^^
-> Warning 33 [unused-open]: unused open Dune__exe.Range.
 $ (cd _build/default && /home/student/.opam/4.13.1/bin/ocamlc.opt -w @1..3@5..28@30..39@43@46..47@49..57@61..62-40 -strict-sequence -strict-formats -short-paths -keep-locs -warn-error -A -no-strict-formats -g -bin-annot -I .main.eobjs/byte -no-alias-deps -opaque -open Dune__exe -o .main.eobjs/byte/dune__exe__Driver.cmo -c -impl driver.ml)
 > File "driver.ml", line 95, characters 16-29:
 > 95 |                 Llparser.prog Lllexer.token
 >                      ^^^^^^^^^^^^^
 > Error: Unbound module Llparser
 [2]
-$ (cd _build/default && /home/student/.opam/4.13.1/bin/ocamlopt.opt -w @1..3@5..28@30..39@43@46..47@49..57@61..62-40 -strict-sequence -strict-formats -short-paths -keep-locs -warn-error -A -no-strict-formats -g -I .main.eobjs/byte -I .main.eobjs/native -intf-suffix .ml -no-alias-deps -opaque -open Dune__exe -o .main.eobjs/native/dune__exe__Progasts.cmx -c -impl progasts.ml)
-$ (cd _build/default && /home/student/.opam/4.13.1/bin/ocamlopt.opt -w @1..3@5..28@30..39@43@46..47@49..57@61..62-40 -strict-sequence -strict-formats -short-paths -keep-locs -warn-error -A -no-strict-formats -g -I .main.eobjs/byte -I .main.eobjs/native -intf-suffix .ml -no-alias-deps -opaque -open Dune__exe -o .main.eobjs/native/dune__exe__Frontend.cmx -c -impl frontend.ml)
-> File "frontend.ml", line 307, characters 8-15:
-> 307 | let rec cmp_exp (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.operand * stream =
->               ^^^^^^^
-> Warning 39 [unused-rec-flag]: unused rec flag.
-> File "frontend.ml", line 356, characters 25-47:
-> 356 |       | Ast.Gfdecl { elt={ frtyp; fname; args } } ->
->                                ^^^^^^^^^^^^^^^^^^^^^^
-> Warning 9 [missing-record-field-pattern]: the following labels are not bound in this record pattern:
-> body
-> Either bind these labels explicitly or add '; _' to the pattern.
-> File "frontend.ml", line 356, characters 19-49:
-> 356 |       | Ast.Gfdecl { elt={ frtyp; fname; args } } ->
->                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-> Warning 9 [missing-record-field-pattern]: the following labels are not bound in this record pattern:
-> loc
-> Either bind these labels explicitly or add '; _' to the pattern.
-> File "frontend.ml", line 398, characters 8-16:
-> 398 | let rec cmp_gexp c (e:Ast.exp node) : Ll.gdecl * (Ll.gid * Ll.gdecl) list =
->               ^^^^^^^^
-> Warning 39 [unused-rec-flag]: unused rec flag.
-> File "frontend.ml", line 434, characters 21-31:
-> 434 |         | Ast.Gvdecl { elt=gd } -> 
->                            ^^^^^^^^^^
-> Warning 9 [missing-record-field-pattern]: the following labels are not bound in this record pattern:
-> loc
-> Either bind these labels explicitly or add '; _' to the pattern.
-> File "frontend.ml", line 2, characters 0-11:
-> 2 | open Llutil
->     ^^^^^^^^^^^
-> Warning 33 [unused-open]: unused open Dune__exe.Llutil.
-> File "frontend.ml", line 277, characters 17-18:
-> 277 | let size_oat_ty (t : Ast.ty) = 8L
->                        ^
-> Warning 27 [unused-var-strict]: unused variable t.
-> File "frontend.ml", line 307, characters 17-18:
-> 307 | let rec cmp_exp (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.operand * stream =
->                        ^
-> Warning 27 [unused-var-strict]: unused variable c.
-> File "frontend.ml", line 307, characters 28-31:
-> 307 | let rec cmp_exp (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.operand * stream =
->                                   ^^^
-> Warning 27 [unused-var-strict]: unused variable exp.
-> File "frontend.ml", line 337, characters 18-19:
-> 337 | let rec cmp_stmt (c:Ctxt.t) (rt:Ll.ty) (stmt:Ast.stmt node) : Ctxt.t * stream =
->                         ^
-> Warning 27 [unused-var-strict]: unused variable c.
-> File "frontend.ml", line 337, characters 29-31:
-> 337 | let rec cmp_stmt (c:Ctxt.t) (rt:Ll.ty) (stmt:Ast.stmt node) : Ctxt.t * stream =
->                                    ^^
-> Warning 27 [unused-var-strict]: unused variable rt.
-> File "frontend.ml", line 337, characters 40-44:
-> 337 | let rec cmp_stmt (c:Ctxt.t) (rt:Ll.ty) (stmt:Ast.stmt node) : Ctxt.t * stream =
->                                               ^^^^
-> Warning 27 [unused-var-strict]: unused variable stmt.
-> File "frontend.ml", line 368, characters 21-22:
-> 368 | let cmp_global_ctxt (c:Ctxt.t) (p:Ast.prog) : Ctxt.t =
->                            ^
-> Warning 27 [unused-var-strict]: unused variable c.
-> File "frontend.ml", line 368, characters 32-33:
-> 368 | let cmp_global_ctxt (c:Ctxt.t) (p:Ast.prog) : Ctxt.t =
->                                       ^
-> Warning 27 [unused-var-strict]: unused variable p.
-> File "frontend.ml", line 383, characters 15-16:
-> 383 | let cmp_fdecl (c:Ctxt.t) (f:Ast.fdecl node) : Ll.fdecl * (Ll.gid * Ll.gdecl) list =
->                      ^
-> Warning 27 [unused-var-strict]: unused variable c.
-> File "frontend.ml", line 383, characters 26-27:
-> 383 | let cmp_fdecl (c:Ctxt.t) (f:Ast.fdecl node) : Ll.fdecl * (Ll.gid * Ll.gdecl) list =
->                                 ^
-> Warning 27 [unused-var-strict]: unused variable f.
-> File "frontend.ml", line 398, characters 17-18:
-> 398 | let rec cmp_gexp c (e:Ast.exp node) : Ll.gdecl * (Ll.gid * Ll.gdecl) list =
->                        ^
-> Warning 27 [unused-var-strict]: unused variable c.
-> File "frontend.ml", line 398, characters 20-21:
-> 398 | let rec cmp_gexp c (e:Ast.exp node) : Ll.gdecl * (Ll.gid * Ll.gdecl) list =
->                           ^
-> Warning 27 [unused-var-strict]: unused variable e.
-$ (cd _build/default && /home/student/.opam/4.13.1/bin/ocamlopt.opt -w @1..3@5..28@30..39@43@46..47@49..57@61..62-40 -strict-sequence -strict-formats -short-paths -keep-locs -warn-error -A -no-strict-formats -g -I .main.eobjs/byte -I .main.eobjs/native -intf-suffix .ml -no-alias-deps -opaque -open Dune__exe -o .main.eobjs/native/dune__exe__Astlib.cmx -c -impl astlib.ml)
-> File "astlib.ml", line 223, characters 24-56:
-> 223 | let print_fdecl_aux fmt {elt={frtyp; fname; args; body}} =
->                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-> Warning 9 [missing-record-field-pattern]: the following labels are not bound in this record pattern:
-> loc
-> Either bind these labels explicitly or add '; _' to the pattern.
-> File "astlib.ml", line 8, characters 0-10:
-> 8 | open Range
+$ (cd _build/default && /home/student/.opam/4.13.1/bin/ocamlopt.opt -w @1..3@5..28@30..39@43@46..47@49..57@61..62-40 -strict-sequence -strict-formats -short-paths -keep-locs -warn-error -A -no-strict-formats -g -I .main.eobjs/byte -I .main.eobjs/native -intf-suffix .ml -no-alias-deps -opaque -open Dune__exe -o .main.eobjs/native/dune__exe__Ast.cmx -c -impl ast.ml)
+> File "ast.ml", line 1, characters 0-10:
+> 1 | open Range
 >     ^^^^^^^^^^
 > Warning 33 [unused-open]: unused open Dune__exe.Range.

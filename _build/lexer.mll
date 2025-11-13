@@ -53,6 +53,22 @@
   ( ")", RPAREN);
   ( "[", LBRACKET);
   ( "]", RBRACKET);
+
+  (*added stuff*)
+  ("bool", TBOOL);
+  ("!=", BANGEQ);
+  ("<", LT);
+  ("<=", LTEQ);
+  (">", GT);
+  (">=", GTEQ);
+  ("&", LAND);
+  ("|", LOR);
+  ("[|]", BOR);
+  ("[&]", BAND);
+  (">>>", SAR);
+  ("<<", SHL);
+  (">>", SLR);
+  ("new", NEW);
   ]
 
 let (symbol_table : (string, Parser.token) Hashtbl.t) = Hashtbl.create 1024
@@ -109,6 +125,7 @@ let uppercase = ['A'-'Z']
 let character = uppercase | lowercase
 let whitespace = ['\t' ' ']
 let digit = ['0'-'9']
+let bool = "true" | "false"
 let hexdigit = ['0'-'9'] | ['a'-'f'] | ['A'-'F']
 (*Define different Lexer states*)
 rule token = parse
@@ -127,7 +144,7 @@ rule token = parse
   | newline { newline lexbuf; token lexbuf }
 
   | ';' | ',' | '{' | '}' | '+' | '-' | '*' | '=' | "==" 
-  | "!=" | '!' | '~' | '(' | ')' | '[' | ']' 
+  | "!=" | '!' | '~' | '(' | ')' | '[' | ']' | '&' | '|'| "[|]" | "[&]" | "<<" | ">>>" | ">>" | '<' | "<=" | '>'| ">=" | "new"
     { create_token lexbuf }
 
   | _ as c { unexpected_char lexbuf c }
