@@ -315,17 +315,27 @@ let rec cmp_exp (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.operand * stream =
     let ll_val = if b then 1L else 0L in
     (I1, Const ll_val, [])
 
-  (* Identifier: x *)
-  (* This compiles an expression, so we LOAD the value from its slot. *)
+  (* Identifier: x
+     1. Look up the variable's stack slot in the context.
+     2. The context gives us the pointer to the slot (e.g., i64).
+     3. We generate a 'Load' instruction to get the value (e.g., i64)
+        from that pointer.
+  *)
   | Id id ->
+    (* Look up the pointer (e.g., i64) and its operand (e.g., %_x1) *)
     let (ll_ptr_ty, ll_ptr_op) = Ctxt.lookup id c in
-    (* Get the type of the value (e.g., I64) from the pointer type (e.g., Ptr I64) *)
+    
+    (* Get the value type (e.g., i64) from the pointer type *)
     let ll_val_ty = match ll_ptr_ty with
       | Ptr t -> t
-      | _ -> failwith ("Identifier " ^ id ^ " is not a pointer type in context")
+      | _ -> failwith ("Identifier " ^ id ^ " not a pointer in context")
     in
+    
+    (* Generate a new UID to hold the loaded value *)
     let res_uid = gensym id in
     let stream = [I (res_uid, Load (ll_ptr_ty, ll_ptr_op))] in
+    
+    (* Return the value's type, the UID holding it, and the load instruction *)
     (ll_val_ty, Id res_uid, stream)
 
   (* Unary Operation: -x, !b, ~y *)
@@ -334,15 +344,12 @@ let rec cmp_exp (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.operand * stream =
     let res_uid = gensym "uop" in
     (match uop with
       | Neg ->
-        (* Implements -x as 0 - x *)
         let insn = I (res_uid, Binop (Sub, I64, Const 0L, e_op)) in
         (I64, Id res_uid, e_stream >@ [insn])
       | Bitnot ->
-        (* Implements ~x as x XOR -1 *)
         let insn = I (res_uid, Binop (Xor, I64, e_op, Const (-1L))) in
         (I64, Id res_uid, e_stream >@ [insn])
       | Lognot ->
-        (* Implements !b as b XOR 1 *)
         let insn = I (res_uid, Binop (Xor, I1, e_op, Const 1L)) in
         (I1, Id res_uid, e_stream >@ [insn])
     )
@@ -354,63 +361,77 @@ let rec cmp_exp (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.operand * stream =
     let arg_stream = e1_stream >@ e2_stream in
     let res_uid = gensym "bop" in
     (match bop with
-      (* Arithmetic: +, -, *, &, | (for I64) *)
+      (* Arithmetic *)
       | Add | Sub | Mul | IAnd | IOr ->
         let ll_bop = match bop with
-          | Add  -> Ll.Add
-          | Sub  -> Ll.Sub
-          | Mul  -> Ll.Mul
-          | IAnd -> Ll.And
-          | IOr  -> Ll.Or
-          | _ -> failwith "Impossible case"
+          | Add  -> Ll.Add | Sub  -> Ll.Sub | Mul  -> Ll.Mul
+          | IAnd -> Ll.And | IOr  -> Ll.Or | _ -> failwith "Impossible"
         in
         let insn = I (res_uid, Binop (ll_bop, I64, e1_op, e2_op)) in
         (I64, Id res_uid, arg_stream >@ [insn])
       
-      (* Bit Shifts: <<, >>, >>> (for I64) *)
+      (* Bit Shifts *)
       | Shl | Shr | Sar ->
         let ll_bop = match bop with
-          | Shl -> Ll.Shl
-          | Shr -> Ll.Lshr  (* Logical Shift Right *)
-          | Sar -> Ll.Ashr  (* Arithmetic Shift Right *)
-          | _ -> failwith "Impossible case"
+          | Shl -> Ll.Shl | Shr -> Ll.Lshr | Sar -> Ll.Ashr | _ -> failwith "Impossible"
         in
         let insn = I (res_uid, Binop (ll_bop, I64, e1_op, e2_op)) in
         (I64, Id res_uid, arg_stream >@ [insn])
 
-      (* Comparisons: ==, !=, <, <=, >, >= (for I64, returns I1) *)
+      (* Comparisons *)
       | Eq | Neq | Lt | Lte | Gt | Gte ->
         let ll_cnd = match bop with
-          | Eq  -> Ll.Eq
-          | Neq -> Ll.Ne
-          | Lt  -> Ll.Slt (* Signed Less Than *)
-          | Lte -> Ll.Sle
-          | Gt  -> Ll.Sgt
-          | Gte -> Ll.Sge
-          | _ -> failwith "Impossible case"
+          | Eq  -> Ll.Eq | Neq -> Ll.Ne | Lt  -> Ll.Slt
+          | Lte -> Ll.Sle | Gt  -> Ll.Sgt | Gte -> Ll.Sge | _ -> failwith "Impossible"
         in
-        (* Note: We use e1_ty, which should be I64 *)
         let insn = I (res_uid, Icmp (ll_cnd, e1_ty, e1_op, e2_op)) in
         (I1, Id res_uid, arg_stream >@ [insn])
 
-      (* Logical: &, | (for I1) *)
+      (* Logical *)
       | And | Or ->
         let ll_bop = match bop with
-          | And -> Ll.And
-          | Or  -> Ll.Or
-          | _ -> failwith "Impossible case"
+          | And -> Ll.And | Or  -> Ll.Or | _ -> failwith "Impossible"
         in
         let insn = I (res_uid, Binop (ll_bop, I1, e1_op, e2_op)) in
         (I1, Id res_uid, arg_stream >@ [insn])
     )
+  | Call (f, es) ->
+    (* This logic restricts calls to simple identifiers, e.g., f(x) *)
+    let func_name =
+      match f.elt with
+      | Ast.Id id -> id  (* Expect the function to be an Id *)
+      | _ -> failwith "Call: function must be a simple identifier"
+    in
+    
+    (* 1. Look up the function directly in the context *)
+    let (f_ptr_ty, f_op) = Ctxt.lookup_function func_name c in
 
+    (* 2. Compile all argument expressions *)
+    let compiled_args = List.map (cmp_exp c) es in
+
+    (* 3. Separate the streams and the (type, operand) pairs *)
+    let arg_streams = List.concat (List.map (fun (_,_,s) -> s) compiled_args) in
+    let arg_ty_op_list = List.map (fun (ty,op,_) -> (ty, op)) compiled_args in
+
+    (* 4. Get the function's return type from its pointer type *)
+    let ret_ty =
+      match f_ptr_ty with
+      | Ptr (Fun (_, rt)) -> rt
+      | _ -> failwith (func_name ^ " is not a function pointer type")
+    in
+    
+    (* 5. Create the call instruction *)
+    let res_id = gensym "call" in
+    let call_insn = I (res_id, Call (ret_ty, f_op, arg_ty_op_list)) in
+
+    (* 6. Return the result type, result ID, and full stream *)
+    (ret_ty, Id res_id, arg_streams >@ [call_insn])
   (* --- Cases below are not yet implemented --- *)
   | CNull rty -> failwith "cmp_exp: CNull not implemented"
   | CStr s -> failwith "cmp_exp: CStr not implemented"
   | CArr (ty, exps) -> failwith "cmp_exp: CArr not implemented"
   | NewArr (ty, exp) -> failwith "cmp_exp: NewArr not implemented"
   | Index (e1, e2) -> failwith "cmp_exp: Index not implemented"
-  | Call (e, exps) -> failwith "cmp_exp: Call not implemented"
 
 (* Compile a statement in context c with return typ rt. Return a new context, 
    possibly extended with new local bindings, and the instruction stream
@@ -444,7 +465,25 @@ let rec cmp_stmt (c:Ctxt.t) (rt:Ll.ty) (stmt:Ast.stmt node) : Ctxt.t * stream = 
       let (e_ty, e, e_stream) = cmp_exp c e_node in
       (c, e_stream >:: (T (Ret (e_ty, Some e)))) 
   | Assn (e1_node, e2_node) -> failwith "unimplemented1"
-  | Decl (id, e_node) -> failwith "unimplemented2"
+  | Decl (id, e_node) ->
+    (* 1. Compile the initializer expression *)
+    let (ll_ty, ll_op, init_stream) = cmp_exp c e_node in
+
+    (* 2. Create the Alloca instruction and hoist it (E) *)
+    let slot_uid = gensym id in
+    let alloca_insn = E (slot_uid, Alloca ll_ty) in
+
+    (* 3. Create the Store instruction to save the value *)
+    (* The destination (Id slot_uid) is the pointer from the alloca *)
+    let store_insn = I (gensym "store", Store (ll_ty, ll_op, Id slot_uid)) in
+
+    (* 4. Add the new variable to the context *)
+    (* We map the OAT id to its pointer type (Ptr ll_ty) and the 
+         operand that holds that pointer (Id slot_uid) *)
+    let new_c = Ctxt.add c id (Ptr ll_ty, Id slot_uid) in
+
+    (* Return the *new* context and the combined instruction stream *)
+    (new_c, init_stream >@ [alloca_insn; store_insn])
   | _ -> failwith "unimplemented3"
 
 (* Compile a series of statements *)
@@ -574,7 +613,7 @@ let cmp_fdecl (c:Ctxt.t) (f:Ast.fdecl node) : Ll.fdecl * (Ll.gid * Ll.gdecl) lis
       (* I: Store the incoming parameter (Id param_id) into its stack slot (Id slot_uid) *)
       let store_insn = I (gensym "store", Store (llvm_ty, Id param_id, Id slot_uid)) in
       (* Build the stream in order *)
-      acc_stream >@ [alloca_insn; store_insn]
+      acc_stream >@ [store_insn; alloca_insn]
     ) [] processed_params
   in
 
@@ -582,7 +621,7 @@ let cmp_fdecl (c:Ctxt.t) (f:Ast.fdecl node) : Ll.fdecl * (Ll.gid * Ll.gdecl) lis
   let _, body_stream = cmp_block c_with_params llvm_ret_ty fdecl_node.body in
 
   (* 5. Combine streams and build the CFG *)
-  let full_stream = param_setup_stream @ body_stream in
+  let full_stream = param_setup_stream >@ body_stream in
   let cfg, hoisted_globals = cfg_of_stream full_stream in
 
   (* 6. Assemble the final LLVM function declaration *)
