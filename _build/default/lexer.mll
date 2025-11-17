@@ -53,6 +53,25 @@
   ( ")", RPAREN);
   ( "[", LBRACKET);
   ( "]", RBRACKET);
+
+  (*added stuff*)
+  ("bool", TBOOL);
+  ("true", TRUE);
+  ("false", FALSE);
+  ("!=", BANGEQ);
+  ("<", LT);
+  ("<=", LTEQ);
+  (">", GT);
+  (">=", GTEQ);
+  ("&", LAND);
+  ("|", LOR);
+  ("[|]", BOR);
+  ("[&]", BAND);
+  (">>>", SAR);
+  ("<<", SHL);
+  (">>", SLR);
+  ("new", NEW);
+  ("for", FOR)
   ]
 
 let (symbol_table : (string, Parser.token) Hashtbl.t) = Hashtbl.create 1024
@@ -125,11 +144,9 @@ rule token = parse
   | digit+ | "0x" hexdigit+ { INT (Int64.of_string (lexeme lexbuf)) } (*plus meaning at least one whereas the kleene star means at least 0*)
   | whitespace+ { token lexbuf }
   | newline { newline lexbuf; token lexbuf }
-
   | ';' | ',' | '{' | '}' | '+' | '-' | '*' | '=' | "==" 
-  | "!=" | '!' | '~' | '(' | ')' | '[' | ']' 
+  | "!=" | '!' | '~' | '(' | ')' | '[' | ']' | '&' | '|'| "[|]" | "[&]" | "<<" | ">>>" | ">>" | '<' | "<=" | '>'| ">=" | "new" | "for"
     { create_token lexbuf }
-
   | _ as c { unexpected_char lexbuf c }
 
 and directive state = parse

@@ -395,44 +395,86 @@ let rec cmp_exp (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.operand * stream =
         let insn = I (res_uid, Binop (ll_bop, I1, e1_op, e2_op)) in
         (I1, Id res_uid, arg_stream >@ [insn])
     )
-  | Call (f, es) ->
-    (* This logic restricts calls to simple identifiers, e.g., f(x) *)
-    let func_name =
-      match f.elt with
-      | Ast.Id id -> id  (* Expect the function to be an Id *)
-      | _ -> failwith "Call: function must be a simple identifier"
-    in
-    
-    (* 1. Look up the function directly in the context *)
-    let (f_ptr_ty, f_op) = Ctxt.lookup_function func_name c in
+  | Call (exp_node , exp_node_ls ) ->
+       begin match exp_node.elt with
+        | Id d -> 
+          let llyty , llop = Ctxt.lookup_function d c 
+          in let _, retty =  
+            begin match llyty with 
+              |Ptr (Fun (typesl , return_type )) -> typesl , return_type 
+              | _ -> failwith ("not a pointer to a function, illegal call ")
+            end
+          in let compiled_arg_list = List.map (fun e ->  (cmp_exp c e) ) exp_node_ls 
+          in let output_ls = List.map (fun (e , a , _)  ->  (e ,a ) ) compiled_arg_list 
+          in  let snd_exp_stream = List.flatten (List.map (fun (_, _ ,c) -> c) compiled_arg_list) 
+          in let uid = gensym "funcall"
+          in ( retty , Id uid ,  snd_exp_stream >@ [ I (uid ,  Call (retty , llop  , output_ls)  )] )
+        | _ -> failwith ("cannot call a non function identifier ")
+      end
+  
+  | CNull t -> 
+      let ll_ty = cmp_ty (TRef t) in 
+      (ll_ty, Null, [])
 
-    (* 2. Compile all argument expressions *)
-    let compiled_args = List.map (cmp_exp c) es in
+  | CStr s ->
+      let gid = gensym "str" in
+      let strptr = gensym "str" in
+      (Ptr I8, Id strptr, [I (strptr, Bitcast (Ptr (Array (String.length s + 1, I8)), Gid gid, Ptr I8));
+        G (gid, (Array (String.length s + 1, I8), GString s))])
 
-    (* 3. Separate the streams and the (type, operand) pairs *)
-    let arg_streams = List.concat (List.map (fun (_,_,s) -> s) compiled_args) in
-    let arg_ty_op_list = List.map (fun (ty,op,_) -> (ty, op)) compiled_args in
+  
+  | CArr (ty, es) -> 
+      let len = List.length es in
+      let len_op = Const (Int64.of_int len) in 
+      
+      (* allocate array *)
+      let (arr_ty, arr_op, alloc_stream) = oat_alloc_array ty len_op in (* arr_op is the pointer to the allocated space *)
 
-    (* 4. Get the function's return type from its pointer type *)
-    let ret_ty =
-      match f_ptr_ty with
-      | Ptr (Fun (_, rt)) -> rt
-      | _ -> failwith (func_name ^ " is not a function pointer type")
-    in
-    
-    (* 5. Create the call instruction *)
-    let res_id = gensym "call" in
-    let call_insn = I (res_id, Call (ret_ty, f_op, arg_ty_op_list)) in
+      (* compile and store all the elements *)
+      let (_, store_stream) = 
+      List.fold_left (fun (i, acc_stream) exp -> 
+        
+        let (val_ty, val_op, val_stream) = cmp_exp c exp in (* compile element expression*)
 
-    (* 6. Return the result type, result ID, and full stream *)
-    (ret_ty, Id res_id, arg_streams >@ [call_insn])
-  (* --- Cases below are not yet implemented --- *)
-  | CNull rty -> failwith "cmp_exp: CNull not implemented"
-  | CStr s -> failwith "cmp_exp: CStr not implemented"
-  | CArr (ty, exps) -> failwith "cmp_exp: CArr not implemented"
-  | NewArr (ty, exp) -> failwith "cmp_exp: NewArr not implemented"
-  | Index (e1, e2) -> failwith "cmp_exp: Index not implemented"
+        (* get pointer to arr[i] *)
+        let gep_id = gensym "gep_lit" in
+        let idx_op = Const (Int64.of_int i) in
+        let gep_insn = I (gep_id, Gep (arr_ty, arr_op, [Const 0L; Const 1L; idx_op])) in 
 
+        (* store actual value to that slot - ith index *)
+        let store_insn = I (gensym "store_lit", Store (val_ty, val_op, Id gep_id)) in
+
+        (i + 1, acc_stream >@ val_stream >@ [store_insn; gep_insn]) (* accumulate streams and give next index *)
+
+      ) (0, []) es in (* start with empty stream *)
+
+      (arr_ty, arr_op, alloc_stream >@ store_stream)
+
+  | NewArr (typ, exp_node) -> 
+    let exp_ty, exp_op, exp_strm = cmp_exp c exp_node in
+    let arr_ty, arr_op, arr_strm = oat_alloc_array typ exp_op in
+    (arr_ty, arr_op, exp_strm >@ arr_strm)
+
+| Index(e_array, e_index) -> (
+      let array_ll_type, array_ll_op, array_stream = cmp_exp c e_array in
+      let _, index_ll_op, index_stream = cmp_exp c e_index in
+      
+      match array_ll_type with
+      | Ptr(Struct [_; Array(_, inner_type)]) ->
+        
+        let addr_id = gensym "elem_addr" in
+        let value_id = gensym "read_val" in
+        
+        let gep_insn = Gep(array_ll_type, array_ll_op, [Const(Int64.zero); Const(Int64.one); index_ll_op]) in
+        
+        let load_insn = Load(Ptr(inner_type), Id addr_id) in
+
+        inner_type, 
+        Id(value_id), 
+        array_stream >@ index_stream >:: I(addr_id, gep_insn) >:: I(value_id, load_insn)
+        
+      | _ -> failwith "Indexing into a non-array type"
+  )
 (* Compile a statement in context c with return typ rt. Return a new context, 
    possibly extended with new local bindings, and the instruction stream
    implementing the statement.
@@ -464,7 +506,30 @@ let rec cmp_stmt (c:Ctxt.t) (rt:Ll.ty) (stmt:Ast.stmt node) : Ctxt.t * stream = 
   | Ret (Some e_node) -> 
       let (e_ty, e, e_stream) = cmp_exp c e_node in
       (c, e_stream >:: (T (Ret (e_ty, Some e)))) 
-  | Assn (e1_node, e2_node) -> failwith "unimplemented1"
+
+  | Assn (lhs, exp) ->
+    let (val_ty, val_op, val_stream) = cmp_exp c exp in
+    let ptr_ty, ptr_op, ptr_stream =
+      match lhs.elt with
+      | Ast.Id x ->
+          let (ll_ty, operand) = Ctxt.lookup x c in
+          ll_ty, operand, []
+      | Ast.Index (e_arr, e_idx) ->
+          let (arr_ty, arr_op, arr_stream) = cmp_exp c e_arr in
+          let (_, idx_op, idx_stream) = cmp_exp c e_idx in
+          let elem_ty =
+            match arr_ty with
+            | Ptr (Struct [I64; Array (0, el_ty)]) -> el_ty
+            | _ -> failwith "assigning to non-array element"
+          in
+          let gep_id = gensym "gep" in
+          let gep_insn = I (gep_id, Gep (arr_ty, arr_op, [Const 0L; Const 1L; idx_op])) in
+          Ptr elem_ty, Id gep_id, arr_stream >@ idx_stream >@ [gep_insn]
+      | _ -> failwith "doesnt work"
+    in
+    let store_insn = I (gensym "store", Store (val_ty, val_op, ptr_op)) in
+    (c, val_stream >@ ptr_stream >@ [store_insn])
+
   | Decl (id, e_node) ->
     (* 1. Compile the initializer expression *)
     let (ll_ty, ll_op, init_stream) = cmp_exp c e_node in
@@ -484,7 +549,118 @@ let rec cmp_stmt (c:Ctxt.t) (rt:Ll.ty) (stmt:Ast.stmt node) : Ctxt.t * stream = 
 
     (* Return the *new* context and the combined instruction stream *)
     (new_c, init_stream >@ [alloca_insn; store_insn])
-  | _ -> failwith "unimplemented3"
+    | If (cond, then_block, else_block) ->
+      let l_then = gensym "then" in
+      let l_else = gensym "else" in
+      let l_join = gensym "join" in (* after the if/else *)
+
+      let (cond_ty, cond_op, cond_stream) = cmp_exp c cond in (* compile condition expression *)
+
+      let cbr_term = T (Cbr (cond_op, l_then, l_else)) in (* terminator for conditional branch *)
+
+      let (_, then_stream) = cmp_block c rt then_block in (* then block - use original context c because variables in if dont escape *)
+
+      let (_, else_stream) = cmp_block c rt else_block in (* else block *)
+
+      (* final instruction stream in order *)
+      let stream =
+        cond_stream
+        >@ [ cbr_term ]
+        
+        >@ [ L l_then ] (* start of then block *)
+        >@ then_stream (* code for then *)
+        >@ [ T (Br l_join) ] (* jump to join *)
+
+        >@ [ L l_else ] (* start of else block *)
+        >@ else_stream
+        >@ [ T (Br l_join) ]
+        
+        >@ [ L l_join ] 
+      in
+      (c, stream) (* context unchanged *)
+
+| SCall (f, es) -> 
+     let func_name =
+        match f.elt with
+        | Ast.Id id -> id  (* This is what we expect, e.g., "foo" *)
+        | _ -> failwith "SCall: function must be a simple identifier"
+      in
+
+      let (f_ptr_ty, f_op) = Ctxt.lookup_function func_name c in
+
+      let compiled_args = List.map (cmp_exp c) es in
+
+      let arg_streams = List.concat (List.map (fun (_,_,s) -> s) compiled_args) in
+      let arg_ty_op_list = List.map (fun (ty,op,_) -> (ty, op)) compiled_args in
+
+      let ret_ty =
+        match f_ptr_ty with
+        | Ptr (Fun (_, rt)) -> rt
+        | _ -> failwith (func_name ^ " is not a function pointer type")
+      in
+
+      let res_id = gensym "scall_void" in
+      let call_insn = I (res_id, Call (ret_ty, f_op, arg_ty_op_list)) in
+
+      (c, arg_streams >@ [call_insn])
+
+  | While (cond, body) ->
+    let l_cond = gensym "while_cond" in
+    let l_body = gensym "while_body" in
+    let l_exit = gensym "while_exit" in
+    let (cond_ty, cond_op, cond_stream) = cmp_exp c cond in
+    let (_, body_stream) = cmp_block c rt body in
+    let stream =
+      [T (Br l_cond)]
+      >@ [L l_cond]
+      >@ cond_stream
+      >@ [T (Cbr (cond_op, l_body, l_exit))]
+      >@ [L l_body]
+      >@ body_stream
+      >@ [T (Br l_cond)]
+      >@ [L l_exit]
+    in
+    (c, stream)
+    
+  | For (init, cond_opt, post_stmt, body_block) ->
+    let init_block =
+      List.map (fun ((x, init_exp) as vd) ->
+        { Ast.elt = Ast.Decl vd; loc = init_exp.loc }
+      ) init
+    in
+    let (c_after_init, init_stream) = cmp_block c rt init_block in
+
+      let l_cond = gensym "for_cond" in
+      let l_body = gensym "for_body" in
+      let l_exit = gensym "for_exit" in
+
+      let cond_exp =
+        match cond_opt with
+        | Some e -> e
+        | None -> Ast.no_loc (Ast.CBool true)
+      in
+      let (_, cond_op, cond_stream) = cmp_exp c_after_init cond_exp in
+
+      let (_, body_stream) = cmp_block c_after_init rt body_block in
+      let (_, post_stream) =
+        match post_stmt with
+        | Some stmt -> cmp_stmt c_after_init rt stmt
+        | None -> (c_after_init, [])
+      in
+
+      let loop_stream =
+        init_stream
+        >@ [T (Br l_cond)]
+        >@ [L l_cond]
+        >@ cond_stream
+        >@ [T (Cbr (cond_op, l_body, l_exit))]
+        >@ [L l_body]
+        >@ body_stream
+        >@ post_stream
+        >@ [T (Br l_cond)]
+        >@ [L l_exit]
+      in
+      (c_after_init, loop_stream)
 
 (* Compile a series of statements *)
 and cmp_block (c:Ctxt.t) (rt:Ll.ty) (stmts:Ast.block) : Ctxt.t * stream =
@@ -531,8 +707,28 @@ let rec cmp_gexp (c : Ctxt.t) (e:Ast.exp node) : Ll.gdecl * (Ll.gid * Ll.gdecl) 
     let wanted_ty = Ptr I8 in
     let cast = GBitcast(original_ty, GGid gid, wanted_ty) in
     (wanted_ty, cast), [(gid, (hoist_ty, GString s))]
-    | CArr (arr_ty, arr_nodes) -> failwith "CArr case not implemented! [cmp_gexp]"
-    | _ -> failwith "invalid expression! [cmp_gexp]"
+    
+| CArr (ast_elem_ty, init_list) ->
+    begin
+      let ll_elem_ty =
+        begin match ast_elem_ty with
+        | Ast.TRef (Ast.RString) -> Ll.Array ((List.length(init_list)) + 1, Ll.I8)
+        | _ -> cmp_ty ast_elem_ty
+      end in
+      let sized_struct_type = Ll.Struct ([Ll.I64; Ll.Array ((List.length(init_list), ll_elem_ty))]) in
+      let elem_inits, nested_global_decls = List.map (cmp_gexp c) init_list |> List.split in
+      let all_hoisted_decls = List.flatten nested_global_decls in
+      let array_data_pair = (Ll.Array(List.length elem_inits, ll_elem_ty) ,Ll.GArray elem_inits) in
+      let length_pair = (Ll.I64, Ll.GInt (Int64.of_int (List.length init_list))) in
+      let (sized_struct_init: Ll.ginit) = Ll.GStruct ([length_pair; array_data_pair]) in
+      let std_array_ptr_type = Ll.Ptr (Ll.Struct [Ll.I64; Ll.Array (0, ll_elem_ty)]) in
+      let data_gid = gensym "global_arr_data" in
+      let (hoisted_data_decl: Ll.gid * Ll.gdecl) = data_gid, (sized_struct_type, sized_struct_init) in
+      let final_bitcast_init = Ll.GBitcast ( Ll.Ptr sized_struct_type, Ll.GGid data_gid, std_array_ptr_type) in
+      
+      (( std_array_ptr_type, final_bitcast_init), all_hoisted_decls @ [hoisted_data_decl] )
+    end
+  | _ -> failwith "Invalid global initializer expression"
 
 
 
